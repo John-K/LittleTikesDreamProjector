@@ -60,11 +60,17 @@ With the cartridge label facing down:
 
 > [!NOTE]
 > `GND_SENSE` is connected to `GND` physically on the cartridge. 
+>
 > `VCC_SENSE` is connected to `VCC` physically on the cartridge. 
+>
 > These are likely used in tandem to determine when a cartridge is fully inserted
 
 > [!IMPORTANT]
-> I left `GND_SENSE` and `VCC_SENSE` disconnected initially, but ran into signal integrity issues (dumps of the same cartridge were not identical). To solve this, I connected `GND_SENSE` to another `GND` point on my interface board and this solved the issues and each dump of the same cartridge became identical. (I did not connect `VCC_SENSE`, although it is safe to do so)
+> I left `GND_SENSE` and `VCC_SENSE` disconnected initially, but ran into signal integrity issues (dumps of the same cartridge were not identical).
+>
+> To solve this, I connected `GND_SENSE` to another `GND` point on my interface board and this solved the issues and each dump of the same cartridge became identical.
+>
+> (I did not connect `VCC_SENSE`, although it is safe to do so)
 
 > [!IMPORTANT]
 > When running the dumper software on Windows with a FT2232H based board, you will need to re-assign the driver to `libusb-win32`
