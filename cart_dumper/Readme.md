@@ -1,4 +1,4 @@
-# Little Tikes Dream Projector Cartridge Reader
+# Little Tikes Story Dream Machine Cartridge Reader
 ![Photo of an assembled cartridge interface board](photos/assembled_board_top.jpg)
 
 This is a stable, yet bare bones cartridge reader for the Little Tikes Dream Projector.
