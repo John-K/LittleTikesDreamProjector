@@ -1,6 +1,6 @@
-# Little Tikes Dream Projector
+# Little Tikes Story Dream Machine
 
-This repository contains projects to interface with and manipulate story cartridges for the Little Tikes Dream Projector
+This repository contains projects to interface with and manipulate story cartridges for the Little Tikes Story Dream Machine
 
 Projects:
  * [cart_dumper](/cart_dumper) - hardware and software to interface with story cartridges without breaking them apart
