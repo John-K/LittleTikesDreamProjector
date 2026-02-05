@@ -13,6 +13,13 @@ See [Known Cartridges](known_cartridges.md)
 * Recommend running twice and comparing the two dumps, ie `shasum *.bin`
     * See the "Important" callout below for information on how to fix mismatching dumps
 
+> [!IMPORTANT]
+> When running the dumper software on Windows with a FT2232H based board, you will need to re-assign the driver to `libusb-win32`
+>
+> Ensure that `Options->Ignore Hubs or Composite Parents` is *unchecked*
+>
+> Select `<device name> (Composite Parent)' and 'libusb-win32' (even on 64-bit OS) and click `Replace Driver` - this will take a few minutes
+
 ## Hardware
 I used a [Tigard](https://1bitsquared.com/products/tigard) because I had one laying around, and I didn't need to write (much) code to do it. You should be able to use any `FT2232H` based board, although you'd have to figure out how to hook things up.
 
@@ -71,10 +78,3 @@ With the cartridge label facing down:
 > To solve this, I connected `GND_SENSE` to another `GND` point on my interface board and this solved the issues and each dump of the same cartridge became identical.
 >
 > (I did not connect `VCC_SENSE`, although it is safe to do so)
-
-> [!IMPORTANT]
-> When running the dumper software on Windows with a FT2232H based board, you will need to re-assign the driver to `libusb-win32`
->
-> Ensure that `Options->Ignore Hubs or Composite Parents` is *unchecked*
->
-> Select `<device name> (Composite Parent)' and 'libusb-win32' (even on 64-bit OS) and click `Replace Driver` - this will take a few minutes
