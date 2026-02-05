@@ -1,5 +1,5 @@
 # Little Tikes Dream Projector Cartridge Reader
-![Photo of an assembled cartridge interface board](/photos/assembled_board_top.jpg)
+![Photo of an assembled cartridge interface board](photos/assembled_board_top.jpg)
 
 This is a stable, yet bare bones cartridge reader for the Little Tikes Dream Projector.
 
@@ -36,7 +36,7 @@ I used a [Tigard](https://1bitsquared.com/products/tigard) because I had one lay
     * for example if using protoboard with connections on the backside (ensure there is a gap between the two rows of socket pins)
 * If using an Adafruit Perma-Proto, you may need to bend the pins slightly out from their original position to fit it over the middle gap.
 
-![Photo of an assembled cartridge interface board](/photos/assembled_board.jpg)
+![Photo of an assembled cartridge interface board](photos/assembled_board.jpg)
 
 Once the reader board is built, wire it up to your interface board of choice.
 
@@ -56,7 +56,7 @@ With the cartridge label facing down:
 +----------------------------+  5     6          7      8
 ```
 
-![Photo of an assembled cartridge interface board with cartridge inserted](/photos/cart_inserted.jpg)
+![Photo of an assembled cartridge interface board with cartridge inserted](photos/cart_inserted.jpg)
 
 > [!NOTE]
 > `GND_SENSE` is connected to `GND` physically on the cartridge. 
