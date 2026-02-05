@@ -14,7 +14,7 @@ See [Known Cartridges](known_cartridges.md)
     * See the "Important" callout below for information on how to fix mismatching dumps
 
 > [!IMPORTANT]
-> When running the dumper software on Windows with a FT2232H based board, you will need to re-assign the driver to `libusb-win32`
+> When running the dumper software on Windows with a FT2232H based board, you will need to re-assign the driver to `libusb-win32` using a tool such as [Zadig](https://zadig.akeo.ie/)
 >
 > Ensure that `Options->Ignore Hubs or Composite Parents` is *unchecked*
 >
