@@ -3,6 +3,9 @@
 
 This is a stable, yet bare bones cartridge reader for the Little Tikes Dream Projector.
 
+## Known Good Cartridges
+See [Known Cartridges](known_cartridges.md)
+
 ## Software
 * `pip install -r Requirements.txt`
 * `python dump_spiflash.py` will generate a 1MiB `dump.bin` file with the contents of the SPI Flash
