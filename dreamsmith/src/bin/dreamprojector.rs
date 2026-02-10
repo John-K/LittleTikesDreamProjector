@@ -176,20 +176,50 @@ impl eframe::App for DreamProjectorApp {
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            // --- Chapter list ---
-            ui.heading("Chapters");
-            egui::ScrollArea::vertical()
-                .max_height(200.0)
-                .show(ui, |ui| {
-                    for i in 0..self.book.pages.len() {
-                        let dur_s = self.chapter_durations_ms[i] / 1000.0;
-                        let label = format!("Chapter {} ({:.1}s)", i + 1, dur_s);
-                        let selected = i == self.current_chapter;
-                        if ui.selectable_label(selected, &label).clicked() && !selected {
-                            self.select_chapter(i);
-                        }
-                    }
+            // --- Chapter list + LED circle side by side ---
+            ui.horizontal(|ui| {
+                // Left: chapter list
+                ui.vertical(|ui| {
+                    ui.heading("Chapters");
+                    egui::ScrollArea::vertical()
+                        .max_height(200.0)
+                        .show(ui, |ui| {
+                            for i in 0..self.book.pages.len() {
+                                let dur_s = self.chapter_durations_ms[i] / 1000.0;
+                                let label = format!("Chapter {} ({:.1}s)", i + 1, dur_s);
+                                let selected = i == self.current_chapter;
+                                if ui.selectable_label(selected, &label).clicked() && !selected {
+                                    self.select_chapter(i);
+                                }
+                            }
+                        });
                 });
+
+                ui.separator();
+
+                // Right: LED circle
+                ui.vertical(|ui| {
+                    let (r, g, b) = self.current_led_color();
+                    let color = egui::Color32::from_rgb(r, g, b);
+
+                    let radius = 60.0;
+                    let (rect, _) = ui.allocate_exact_size(
+                        egui::vec2(radius * 2.0, radius * 2.0),
+                        egui::Sense::hover(),
+                    );
+                    let center = rect.center();
+                    let painter = ui.painter();
+
+                    painter.circle_stroke(
+                        center,
+                        radius,
+                        egui::Stroke::new(2.0, egui::Color32::GRAY),
+                    );
+                    painter.circle_filled(center, radius - 2.0, color);
+
+                    ui.label(format!("LED: R={} G={} B={}", r, g, b));
+                });
+            });
 
             ui.separator();
 
@@ -244,27 +274,6 @@ impl eframe::App for DreamProjectorApp {
                     dur_s % 60.0
                 ));
             });
-
-            ui.separator();
-
-            // --- LED circle ---
-            let (r, g, b) = self.current_led_color();
-            let color = egui::Color32::from_rgb(r, g, b);
-
-            let available = ui.available_size();
-            let radius = available.x.min(available.y).min(120.0) / 2.0;
-            let (rect, _) =
-                ui.allocate_exact_size(egui::vec2(radius * 2.0, radius * 2.0), egui::Sense::hover());
-            let center = rect.center();
-            let painter = ui.painter();
-
-            // Draw a border circle
-            painter.circle_stroke(center, radius, egui::Stroke::new(2.0, egui::Color32::GRAY));
-            // Draw the filled circle
-            painter.circle_filled(center, radius - 2.0, color);
-
-            // Show RGB values
-            ui.label(format!("LED: R={} G={} B={}", r, g, b));
         });
 
         // Request continuous repaint while playing
