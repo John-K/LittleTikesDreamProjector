@@ -72,7 +72,7 @@ impl std::fmt::Display for LightShowEntry {
         let mut buf = String::new();
         //write!(f, "{}: ", self.frame_count);
         for entry in &self.frames {
-            write!(buf, "{:?}:{}, ", entry.channel, entry.level)?;
+            write!(buf, "{:?}: {:>3}, ", entry.channel, entry.level)?;
         }
         buf.truncate(buf.len() - 2);
         write!(f, "{buf}")

@@ -157,7 +157,7 @@ impl DreamProjectorApp {
 
     fn current_led_color(&self) -> (u8, u8, u8) {
         let page = &self.book.pages[self.current_page];
-        let Some(ref lights) = page.lights else {
+        let Some(_) = page.lights else {
             return (0, 0, 0);
         };
 

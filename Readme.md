@@ -4,6 +4,7 @@ This repository contains projects to interface with and manipulate story cartrid
 
 Projects:
  * [cart_dumper](/cart_dumper) - hardware and software to interface with story cartridges without breaking them apart
+ * [dreamsmith](/dreamsmith/) - tools to parse and visualize the contents of story cartridges
 
 ## Other resources
  * [Reddit post that kicked everything off](https://www.reddit.com/r/toddlers/comments/1hm9kzs/hack_the_little_tikes_dream_machine/)

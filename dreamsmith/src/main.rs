@@ -14,8 +14,11 @@ fn write_a18(name: String, page: &AudioClip) -> Result<()> {
 */
 
 fn main() -> Result<()>{
-    //let image = std::fs::read("test_data/BSLSBSBaseF.bin")?;
-    let image = std::fs::read("test_data/Paw_Patrol-All-Star_Pups.bin")?;
+    let args: Vec<String> = std::env::args().collect();
+    let path = args
+        .get(1)
+        .expect("Usage: dreamsmith <storybook.bin>");
+    let image = std::fs::read(path)?;
     let mut cursor = io::Cursor::new(image);
     let book = StoryBook::read(&mut cursor)?;
     println!("{book:#x?}");
