@@ -94,6 +94,28 @@ impl LightShow {
         self.entries.iter().map(|e| e.duration()).sum()
     }
 
+    pub fn get_color_sequence(&self) -> Vec<(u8, u8, u8)> {
+        let mut colors = Vec::new();
+        let mut r: u8 = 0;
+        let mut g: u8 = 0;
+        let mut b: u8 = 0;
+
+        for entry in &self.entries {
+            for elem in &entry.frames {
+                match elem.channel {
+                    LightChannel::Red => r = elem.level,
+                    LightChannel::Green => g = elem.level,
+                    LightChannel::Blue => b = elem.level,
+                    _ => {}
+                }
+            }
+            for _ in 0..entry.frame_count {
+                colors.push((r, g, b));
+            }
+        }
+        colors
+    }
+
     /// Evaluate the RGB color at a given offset (in ms) into the lightshow.
     /// Channels are sticky: only updated channels change, others retain previous values.
     pub fn color_at(&self, offset_ms: u32) -> (u8, u8, u8) {
