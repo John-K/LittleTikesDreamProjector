@@ -1,46 +1,12 @@
+use binrw::*;
+
 mod audioclip;
 mod lightshow;
+mod page;
 
 pub use audioclip::*;
 pub use lightshow::*;
-
-use binrw::*;
-use binrw::io::SeekFrom;
-
-// in All-Star Pups, second count is greater than the first, so we need to protect against this (is 0x007f)
-fn try_sub(a: u16, b: u16) -> u16 {
-    if b < a {
-        a - b
-    } else {
-        a
-    }
-}
-
-#[binrw]
-#[brw(little)]
-//#[derive(Debug)]
-//#[br(import(offsets: &Vec<u32>))]
-pub struct Page {
-    pub audio: AudioClip,
-    #[br(try)]
-    pub lights: Option<LightShow>,
-}
-
-impl std::fmt::Display for Page {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Page: {:>6} audio bytes @ {}kBps, LightShow: ", self.audio.data.len(), self.audio.bitrate / 1000)?;
-        match &self.lights {
-            None => write!(f, "<None>"),
-            Some(show) => write!(f, "{}", show)
-        }
-    }
-}
-
-impl std::fmt::Debug for Page {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
-    }
-}
+pub use page::*;
 
 #[binrw]
 #[brw(little)]
@@ -67,6 +33,16 @@ impl std::fmt::Display for StoryBook {
     }
 }
 
+// in All-Star Pups, second count is greater than the first, so we need to protect against this (is 0x007f)
+fn try_sub(a: u16, b: u16) -> u16 {
+    if b < a {
+        a - b
+    } else {
+        a
+    }
+}
+
+/*
 #[binrw::parser(reader, endian)]
 fn page_reader(offsets: &Vec<u32>) -> BinResult<Vec<Page>> {
     let mut pages = Vec::new();
@@ -76,4 +52,4 @@ fn page_reader(offsets: &Vec<u32>) -> BinResult<Vec<Page>> {
        pages.push(page);
     }
     Ok(pages)
-}
+}*/

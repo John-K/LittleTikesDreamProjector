@@ -1,6 +1,8 @@
 use anyhow::{Result};
 use binrw::*;
-use dreamsmith::*;
+
+mod storybook;
+use storybook::*;
 
 /*
 fn write_a18(name: String, page: &AudioClip) -> Result<()> {
