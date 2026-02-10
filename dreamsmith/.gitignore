@@ -1,0 +1,5 @@
+/target
+*.bin
+*.a18
+test_data/
+*.wav
