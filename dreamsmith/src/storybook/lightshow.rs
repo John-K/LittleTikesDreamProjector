@@ -56,7 +56,7 @@ pub struct LightShowEntry {
 
 impl LightShowEntry {
     /// get duration of entry in ms
-    fn duration(&self) -> u32 {
+    pub fn duration(&self) -> u32 {
         20 * self.frame_count as u32
     }
 
@@ -86,6 +86,39 @@ impl std::fmt::Display for LightShowEntry {
 pub struct LightShow {
     #[br(parse_with = read_until_end_marker)]
     pub entries: Vec<LightShowEntry>
+}
+
+impl LightShow {
+    /// Total duration of the lightshow in milliseconds.
+    pub fn total_duration_ms(&self) -> u32 {
+        self.entries.iter().map(|e| e.duration()).sum()
+    }
+
+    /// Evaluate the RGB color at a given offset (in ms) into the lightshow.
+    /// Channels are sticky: only updated channels change, others retain previous values.
+    pub fn color_at(&self, offset_ms: u32) -> (u8, u8, u8) {
+        let mut r: u8 = 0;
+        let mut g: u8 = 0;
+        let mut b: u8 = 0;
+        let mut t: u32 = 0;
+
+        for entry in &self.entries {
+            for elem in &entry.frames {
+                match elem.channel {
+                    LightChannel::Red => r = elem.level,
+                    LightChannel::Green => g = elem.level,
+                    LightChannel::Blue => b = elem.level,
+                    _ => {}
+                }
+            }
+            t += entry.duration();
+            if t > offset_ms {
+                break;
+            }
+        }
+
+        (r, g, b)
+    }
 }
 
 impl std::fmt::Display for LightShow {
