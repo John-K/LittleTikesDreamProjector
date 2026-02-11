@@ -10,4 +10,4 @@ binrw = "0.15.0"
 hex = "0.4.3"
 eframe = "0.31"
 int-enum = "1.2.0"
-rodio = "0.20"
+rodio = { version = "0.21", default-features = false, features = ["playback", "hound"] }

@@ -1,15 +1,10 @@
 use anyhow::Result;
 use binrw::BinRead;
-use eframe::egui;
-use rodio::{buffer::SamplesBuffer, OutputStream, OutputStreamHandle, Sink};
-use std::time::Instant;
-use std::sync::mpsc::{channel, Sender, Receiver};
 use dreamsmith::storybook::*;
-
-struct AudioOutput {
-    _stream: OutputStream,
-    stream_handle: OutputStreamHandle,
-}
+use eframe::egui;
+use rodio::{OutputStream, OutputStreamBuilder, Sink, buffer::SamplesBuffer};
+use std::sync::mpsc::{Receiver, Sender, channel};
+use std::time::Instant;
 
 #[derive(PartialEq)]
 enum AsyncCommand {
@@ -24,7 +19,7 @@ struct DreamProjectorApp {
     pcm_cache: Vec<Vec<i16>>,
 
     // Audio playback (None if no audio device available)
-    audio_output: Option<AudioOutput>,
+    audio_output: Option<OutputStream>,
     sink: Option<Sink>,
     playing: bool,
     playback_start: Option<Instant>,
@@ -42,13 +37,18 @@ struct DreamProjectorApp {
 impl DreamProjectorApp {
     fn new(book: StoryBook) -> Self {
         let pcm_cache: Vec<Vec<i16>> = book.pages.iter().map(|p| p.audio.decode_to_pcm()).collect();
-        let page_durations_ms: Vec<f64> = book.pages.iter().map(|p| p.audio.duration_ms()).collect();
-        let page_color_sequences: Vec<Vec<(u8, u8, u8)>> = book.pages.iter().map(|p| match &p.lights {
-            None => vec![],
-            Some(lights) => lights.get_color_sequence(),
-        }).collect();
-        let audio_output = match OutputStream::try_default() {
-            Ok((_stream, stream_handle)) => Some(AudioOutput { _stream, stream_handle }),
+        let page_durations_ms: Vec<f64> =
+            book.pages.iter().map(|p| p.audio.duration_ms()).collect();
+        let page_color_sequences: Vec<Vec<(u8, u8, u8)>> = book
+            .pages
+            .iter()
+            .map(|p| match &p.lights {
+                None => vec![],
+                Some(lights) => lights.get_color_sequence(),
+            })
+            .collect();
+        let audio_output = match OutputStreamBuilder::open_default_stream() {
+            Ok(stream) => Some(stream),
             Err(e) => {
                 eprintln!("Warning: no audio output available ({e}), playback disabled");
                 None
@@ -101,14 +101,18 @@ impl DreamProjectorApp {
         if skip_samples >= pcm.len() {
             return;
         }
-        let remaining = &pcm[skip_samples..];
 
-        let source = SamplesBuffer::new(1, 16000, remaining.to_vec());
-        if let Ok(sink) = Sink::try_new(&audio_output.stream_handle) {
-            sink.append(source);
-            self.sink = Some(sink);
-        }
+        let remaining = pcm[skip_samples..]
+            .to_vec()
+            .iter()
+            .map(|s| *s as f32 / 32767.0)
+            .collect::<Vec<_>>();
 
+        let source = SamplesBuffer::new(1, 16000, remaining);
+        let sink = Sink::connect_new(audio_output.mixer());
+        sink.append(source);
+
+        self.sink = Some(sink);
         self.playing = true;
         self.pause_offset_ms = offset_ms;
         self.playback_start = Some(Instant::now());
@@ -168,18 +172,6 @@ impl DreamProjectorApp {
         } else {
             seq.last().cloned().unwrap_or((0, 0, 0))
         }
-/* 
-        let audio_dur = self.page_durations_ms[self.current_page];
-        let light_dur = lights.total_duration_ms() as f64;
-        let light_start = (audio_dur - light_dur).max(0.0);
-        let pos = self.current_position_ms();
-        let light_offset = pos - light_start;
-
-        if light_offset < 0.0 {
-            (0, 0, 0)
-        } else {
-            lights.color_at(light_offset as u32)
-        }*/
     }
     fn play_delayed(&self, delay: u64, ctx: egui::Context) {
         let tx = self.tx.clone();
@@ -190,9 +182,7 @@ impl DreamProjectorApp {
             ctx.request_repaint();
         });
     }
-
 }
-
 
 impl eframe::App for DreamProjectorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -213,19 +203,19 @@ impl eframe::App for DreamProjectorApp {
         }
 
         // handle async commands (e.g. from delayed play)
-        if let Ok(cmd) = self.rx.try_recv() {
-            if cmd == AsyncCommand::PlayFromStart {
-                self.play_from(0.0);
-            }
+        if let Ok(cmd) = self.rx.try_recv()
+            && cmd == AsyncCommand::PlayFromStart
+        {
+            self.play_from(0.0);
         }
         // uncomment to see bounding boxes when hovering over elements (useful for debugging layout issues)
-/*      ctx.set_debug_on_hover(true);
-        ctx.style_mut(|style| {
-            style.debug.show_expand_width = true;
-            style.debug.show_expand_height = true;
-            style.debug.show_resize = true;
-        });
-*/
+        /*      ctx.set_debug_on_hover(true);
+                ctx.style_mut(|style| {
+                    style.debug.show_expand_width = true;
+                    style.debug.show_expand_height = true;
+                    style.debug.show_resize = true;
+                });
+        */
         egui::CentralPanel::default().show(ctx, |ui| {
             // --- Page list + LED circle side by side ---
             ui.horizontal(|ui| {
@@ -302,39 +292,43 @@ impl eframe::App for DreamProjectorApp {
 
             // --- Timeline ---
             //ui.horizontal(|ui| {
-            ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), 0.0),
-                egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                let pos_s = position / 1000.0;
-                let dur_s = duration / 1000.0;
-                let label = ui.label(format!(
-                    "{:.0}:{:04.1}",
-                    (pos_s / 60.0).floor(),
-                    pos_s % 60.0
-                ));
+            ui.allocate_ui_with_layout(
+                egui::vec2(ui.available_width(), 0.0),
+                egui::Layout::left_to_right(egui::Align::Center),
+                |ui| {
+                    let pos_s = position / 1000.0;
+                    let dur_s = duration / 1000.0;
+                    let label = ui.label(format!(
+                        "{:.0}:{:04.1}",
+                        (pos_s / 60.0).floor(),
+                        pos_s % 60.0
+                    ));
 
-                ui.style_mut().spacing.slider_width = ui.available_width() - 1.5 * label.rect.width();
+                    ui.style_mut().spacing.slider_width =
+                        ui.available_width() - 1.5 * label.rect.width();
 
-                let slider_response = ui.add(
-                    egui::Slider::new(&mut position, 0.0..=duration)
-                        .show_value(false)
-                        .trailing_fill(true),
-                );
+                    let slider_response = ui.add(
+                        egui::Slider::new(&mut position, 0.0..=duration)
+                            .show_value(false)
+                            .trailing_fill(true),
+                    );
 
-                if slider_response.changed() {
-                    // User dragged the slider — seek
-                    if self.playing {
-                        self.play_from(position);
-                    } else {
-                        self.pause_offset_ms = position;
+                    if slider_response.changed() {
+                        // User dragged the slider — seek
+                        if self.playing {
+                            self.play_from(position);
+                        } else {
+                            self.pause_offset_ms = position;
+                        }
                     }
-                }
 
-                ui.label(format!(
-                    "{:.0}:{:04.1}",
-                    (dur_s / 60.0).floor(),
-                    dur_s % 60.0
-                ));
-            });
+                    ui.label(format!(
+                        "{:.0}:{:04.1}",
+                        (dur_s / 60.0).floor(),
+                        dur_s % 60.0
+                    ));
+                },
+            );
         });
 
         // Request continuous repaint while playing
@@ -346,9 +340,7 @@ impl eframe::App for DreamProjectorApp {
 
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
-    let path = args
-        .get(1)
-        .expect("Usage: dreamprojector <storybook.bin>");
+    let path = args.get(1).expect("Usage: dreamprojector <storybook.bin>");
 
     let image = std::fs::read(path)?;
     let mut cursor = std::io::Cursor::new(image);
@@ -366,7 +358,10 @@ fn main() -> Result<()> {
     };
 
     let path = std::path::Path::new(path);
-    let title = format!("DreamProjector - {}", path.file_name().unwrap().to_string_lossy());
+    let title = format!(
+        "DreamProjector - {}",
+        path.file_name().unwrap().to_string_lossy()
+    );
     eframe::run_native(
         &title,
         options,
