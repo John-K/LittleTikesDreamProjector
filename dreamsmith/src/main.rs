@@ -1,5 +1,7 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use binrw::*;
+use sha2::{Digest, Sha256};
+use std::io::Read;
 use std::path::PathBuf;
 
 mod storybook;
@@ -10,6 +12,7 @@ Usage: dreamsmith <command> <file>
 
 Commands:
   info <file>    Parse and display storybook information
+  digest <file>  Measure SHA2 digest for each audio clip
   extract <file> [--out-dir <dir>]
                  Extract audio and lightshow assets from a cartridge
   build <dir> [--out <file>] [--id <hex>]
@@ -31,6 +34,7 @@ fn main() -> Result<()> {
     let command: Option<String> = args.subcommand()?;
     match command.as_deref() {
         Some("info") => cmd_info(&mut args),
+        Some("digest") => cmd_digest(&mut args),
         Some("extract") => cmd_extract(&mut args),
         Some("build") => cmd_build(&mut args),
         Some(other) => bail!("unknown command: {other}\n{HELP}"),
@@ -38,8 +42,51 @@ fn main() -> Result<()> {
     }
 }
 
+fn cmd_digest(args: &mut pico_args::Arguments) -> Result<()> {
+    let path: PathBuf = args
+        .free_from_str()
+        .map_err(|_| anyhow::anyhow!("missing file path\n{HELP}"))?;
+    let remaining = args.clone().finish();
+    if !remaining.is_empty() {
+        bail!("unexpected arguments: {:?}", remaining);
+    }
+
+    let image = std::fs::read(&path)?;
+    let mut cursor = io::Cursor::new(image);
+    let book = StoryBook::read(&mut cursor)?;
+    println!("{book}");
+
+    for (index, offset) in book.audio_offsets.iter().enumerate() {
+        cursor.set_position(*offset as u64);
+        let len: u16 = u16::read_le(&mut cursor)?;
+
+        let mut data: Vec<u8> = vec![0u8; len as usize];
+        cursor.read_exact(&mut data)?;
+        println!(
+            "Audio  {:2}: {}",
+            index,
+            hex::encode(sha2::Sha256::digest(&data))
+        );
+    }
+    for (index, offset) in book.effect_offsets.iter().enumerate() {
+        cursor.set_position(*offset as u64);
+        let len: u16 = u16::read_le(&mut cursor)?;
+
+        let mut data: Vec<u8> = vec![0u8; len as usize];
+        cursor.read_exact(&mut data)?;
+        println!(
+            "Effect {:2}: {}",
+            index + book.audio_offsets.len(),
+            hex::encode(sha2::Sha256::digest(&data))
+        );
+    }
+    Ok(())
+}
+
 fn cmd_info(args: &mut pico_args::Arguments) -> Result<()> {
-    let path: PathBuf = args.free_from_str().map_err(|_| anyhow::anyhow!("missing file path\n{HELP}"))?;
+    let path: PathBuf = args
+        .free_from_str()
+        .map_err(|_| anyhow::anyhow!("missing file path\n{HELP}"))?;
     let remaining = args.clone().finish();
     if !remaining.is_empty() {
         bail!("unexpected arguments: {:?}", remaining);
@@ -50,12 +97,17 @@ fn cmd_info(args: &mut pico_args::Arguments) -> Result<()> {
     let book = StoryBook::read(&mut cursor)?;
     println!("{book:#x?}");
     println!("{book}");
+
     Ok(())
 }
 
 fn cmd_extract(args: &mut pico_args::Arguments) -> Result<()> {
-    let out_dir: PathBuf = args.opt_value_from_str("--out-dir")?.unwrap_or_else(|| PathBuf::from("."));
-    let path: PathBuf = args.free_from_str().map_err(|_| anyhow::anyhow!("missing file path\n{HELP}"))?;
+    let out_dir: PathBuf = args
+        .opt_value_from_str("--out-dir")?
+        .unwrap_or_else(|| PathBuf::from("."));
+    let path: PathBuf = args
+        .free_from_str()
+        .map_err(|_| anyhow::anyhow!("missing file path\n{HELP}"))?;
     let remaining = args.clone().finish();
     if !remaining.is_empty() {
         bail!("unexpected arguments: {:?}", remaining);
@@ -119,8 +171,8 @@ fn cmd_build(args: &mut pico_args::Arguments) -> Result<()> {
             if s.len() != 32 {
                 bail!("--id must be exactly 32 hex characters (got {})", s.len());
             }
-            let bytes = hex::decode(&s)
-                .map_err(|e| anyhow::anyhow!("--id is not valid hex: {e}"))?;
+            let bytes =
+                hex::decode(&s).map_err(|e| anyhow::anyhow!("--id is not valid hex: {e}"))?;
             Ok(bytes.try_into().unwrap())
         })
         .transpose()?;
@@ -191,8 +243,13 @@ fn cmd_build(args: &mut pico_args::Arguments) -> Result<()> {
     let write_effect_offsets = num_effects > 0 && num_pages > 0;
 
     // Header size: 4 bytes (num_audio + num_effects) + 4 bytes per page offset + optional effect offsets
-    let header_size =
-        4 + num_pages * 4 + if write_effect_offsets { num_effects * 4 } else { 0 };
+    let header_size = 4
+        + num_pages * 4
+        + if write_effect_offsets {
+            num_effects * 4
+        } else {
+            0
+        };
 
     // Compute offsets
     let mut page_offsets: Vec<u32> = Vec::new();
@@ -229,10 +286,7 @@ fn cmd_build(args: &mut pico_args::Arguments) -> Result<()> {
 
     const FLASH_SIZE: usize = 1024 * 1024;
     if out.len() > FLASH_SIZE {
-        bail!(
-            "content ({} bytes) exceeds 1 MiB flash size",
-            out.len()
-        );
+        bail!("content ({} bytes) exceeds 1 MiB flash size", out.len());
     }
     out.resize(FLASH_SIZE, 0xFF);
 
@@ -257,14 +311,9 @@ fn encode_wav_to_audioclip_bytes(path: &std::path::Path) -> Result<Vec<u8>> {
     let mut reader = hound::WavReader::open(path)?;
     let spec = reader.spec();
     if spec.channels != 1 || spec.sample_rate != 16_000 || spec.bits_per_sample != 16 {
-        bail!(
-            "{}: expected 16 kHz mono 16-bit PCM",
-            path.display()
-        );
+        bail!("{}: expected 16 kHz mono 16-bit PCM", path.display());
     }
-    let mut samples: Vec<i16> = reader
-        .samples::<i16>()
-        .collect::<Result<_, _>>()?;
+    let mut samples: Vec<i16> = reader.samples::<i16>().collect::<Result<_, _>>()?;
 
     // Pad to multiple of 320 (one A1800 frame)
     let rem = samples.len() % 320;
@@ -276,8 +325,7 @@ fn encode_wav_to_audioclip_bytes(path: &std::path::Path) -> Result<Vec<u8>> {
     let mut encoder = a1800_codec::A1800Encoder::new(0x3E80)
         .map_err(|e| anyhow::anyhow!("encoder init failed: {e:?}"))?;
     let enc_words = encoder.encoded_frame_size();
-    let mut encoded: Vec<u8> =
-        Vec::with_capacity(samples.len() / 320 * enc_words * 2);
+    let mut encoded: Vec<u8> = Vec::with_capacity(samples.len() / 320 * enc_words * 2);
     let mut frame_out = vec![0i16; enc_words];
     for chunk in samples.chunks_exact(320) {
         encoder
