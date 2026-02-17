@@ -42,7 +42,29 @@ fn main() -> Result<()> {
     }
 }
 
+const EFFECT_DIGESTS: [[u8; 32]; 12] = [
+    hex_literal::hex!("841e2f9c7144e74e70f1b4270100820bf10319f3de82d0a6e467203f1b02aece"),
+    hex_literal::hex!("e8003f2c530a6abc69159f32cedc6cf76258fa1d6750f406d55a7a1259850e77"),
+    hex_literal::hex!("0bca382d04efa6fb4e7de5d51c7f5a38c894125f7365acef4a30a9c31a0997fa"),
+    hex_literal::hex!("c8e6de78d6a05f34b0da78fd18fdb56f09f71d03b9502e0a25d414808c70795d"),
+    hex_literal::hex!("12d8fc536607a72aae6b638f6256d3fe77b416c7318e635e77a483e6abe86473"),
+    hex_literal::hex!("1b01dd70da448d909ab64d1acf668bd9ff89c86083d8028e56e326c3a2e8e221"),
+    hex_literal::hex!("ecaeade0a170b15ab01822ab4345e573be020de5f3d83f2b8caaa36f5b362c37"),
+    hex_literal::hex!("709d8f4075bd2a1752f91637d7b28985eb658b08e3d3ee42ffbd7815e6f06038"),
+    hex_literal::hex!("95cf1549d4a1197cc7851ec84b14af7931a1b214fd69aee42cedfe2ad6e1c99d"),
+    hex_literal::hex!("5cde7ff9599f059891abe8560e571cab1b39e4ef4cdc54c138c03d6516dffe25"),
+    hex_literal::hex!("9af88e4fa85100fcf5fde8d31a14a5391ac0de845c6ac5ec29e52e1f10f17fca"),
+    hex_literal::hex!("76f2e65d3d2adb1582891ccee65d44e699e82a1bc0f9058d1ee4508e11fd8b68"),
+];
+
+const REQUIRED_EFFECT_COUNT: u16 = 12;
+
 fn cmd_digest(args: &mut pico_args::Arguments) -> Result<()> {
+    const PAGE_0_DIGEST: [u8; 32] =
+        hex_literal::hex!("05bfd411cfe2857be835143c4d333e96cc8fd5bed75744c412fe2710561b9ebb");
+    const PAGE_1_DIGEST: [u8; 32] =
+        hex_literal::hex!("2fb8657b84432b5945bdb15c7cdfe9d24cc0bb2f630c63b3a8af12f0bead171b");
+
     let path: PathBuf = args
         .free_from_str()
         .map_err(|_| anyhow::anyhow!("missing file path\n{HELP}"))?;
@@ -56,29 +78,67 @@ fn cmd_digest(args: &mut pico_args::Arguments) -> Result<()> {
     let book = StoryBook::read(&mut cursor)?;
     println!("{book}");
 
+    let mut mismatches: String = String::new();
+
+    println!("audio: {} effects: {}", book.num_audio, book.num_effects);
     for (index, offset) in book.audio_offsets.iter().enumerate() {
         cursor.set_position(*offset as u64);
         let len: u16 = u16::read_le(&mut cursor)?;
 
         let mut data: Vec<u8> = vec![0u8; len as usize];
         cursor.read_exact(&mut data)?;
-        println!(
-            "Audio  {:2}: {}",
-            index,
-            hex::encode(sha2::Sha256::digest(&data))
-        );
+        let digest = Sha256::digest(&data);
+        println!("Audio  {:2}: {}", index, hex::encode(&digest));
+
+        if index == 0 && digest != PAGE_0_DIGEST.into()
+            || index == 1 && digest != PAGE_1_DIGEST.into()
+        {
+            mismatches += format!(
+                "Page {index:2} digest validation failed: {} vs {}",
+                hex::encode(&digest),
+                hex::encode(&PAGE_0_DIGEST)
+            )
+            .as_ref();
+        }
+
+        // account for there being no effects listed due to weirdness in header
+        if book.num_effects > book.num_audio
+            && index > (book.num_audio - REQUIRED_EFFECT_COUNT) as usize
+        {
+            //            println!("{index} -> {}", index - REQUIRED_EFFECT_COUNT as usize);
+            let new_index = index - (book.num_audio - REQUIRED_EFFECT_COUNT) as usize;
+            if digest != EFFECT_DIGESTS[new_index].into() {
+                mismatches += format!(
+                    "Effect {index:2} digest validation failed: {} vs {}",
+                    hex::encode(&digest),
+                    hex::encode(&EFFECT_DIGESTS[new_index])
+                )
+                .as_ref();
+            }
+        }
     }
+
     for (index, offset) in book.effect_offsets.iter().enumerate() {
         cursor.set_position(*offset as u64);
         let len: u16 = u16::read_le(&mut cursor)?;
 
         let mut data: Vec<u8> = vec![0u8; len as usize];
         cursor.read_exact(&mut data)?;
-        println!(
-            "Effect {:2}: {}",
-            index + book.audio_offsets.len(),
-            hex::encode(sha2::Sha256::digest(&data))
-        );
+        let digest = Sha256::digest(&data);
+        println!("Effect {:2}: {}", index, hex::encode(&digest));
+
+        if digest != EFFECT_DIGESTS[index].into() {
+            mismatches += format!(
+                "Effect {index:2} digest validation failed: {} vs {}",
+                hex::encode(&digest),
+                hex::encode(&EFFECT_DIGESTS[index])
+            )
+            .as_ref();
+        }
+    }
+
+    if !mismatches.is_empty() {
+        println!("Common audio clips do not match reference:\n{mismatches}");
     }
     Ok(())
 }
