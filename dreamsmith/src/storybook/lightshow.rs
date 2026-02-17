@@ -24,7 +24,7 @@ fn read_until_end_marker<R: io::Read + io::Seek>(
 ) -> BinResult<Vec<LightShowEntry>> {
     let mut out = Vec::new();
     loop {
-        let entry:LightShowEntry = reader.read_type(endian)?;
+        let entry: LightShowEntry = reader.read_type(endian)?;
         let is_end = entry.is_end();
         out.push(entry);
         if is_end {
@@ -34,13 +34,12 @@ fn read_until_end_marker<R: io::Read + io::Seek>(
     Ok(out)
 }
 
-
 #[binrw]
 #[brw(little)]
 #[derive(Debug)]
 pub struct LightElement {
     pub channel: LightChannel,
-    pub level: u8
+    pub level: u8,
 }
 
 #[binrw]
@@ -49,9 +48,9 @@ pub struct LightElement {
 /// Starts with 0x04 duration 0xf0 channels, 00 frame
 /// Ends with 0x04 0xf1 00
 pub struct LightShowEntry {
-    pub frame_count: u8,   // in 20ms steps (one frame), observed 0x04, 0x08, 0x0c
+    pub frame_count: u8, // in 20ms steps (one frame), observed 0x04, 0x08, 0x0c
     #[br(count = frame_count / 4)]
-    pub frames: Vec<LightElement>
+    pub frames: Vec<LightElement>,
 }
 
 impl LightShowEntry {
@@ -62,7 +61,7 @@ impl LightShowEntry {
 
     // is this entry an End Marker
     fn is_end(&self) -> bool {
-        self.frame_count == 0x04 && self.frames[0].channel == LightChannel::EndMarker 
+        self.frame_count == 0x04 && self.frames[0].channel == LightChannel::EndMarker
     }
 }
 
@@ -85,15 +84,17 @@ impl std::fmt::Display for LightShowEntry {
 #[brw(magic = b"\x04\xF0\x00")]
 pub struct LightShow {
     #[br(parse_with = read_until_end_marker)]
-    pub entries: Vec<LightShowEntry>
+    pub entries: Vec<LightShowEntry>,
 }
 
 impl LightShow {
     /// Total duration of the lightshow in milliseconds.
+    #[allow(dead_code)]
     pub fn total_duration_ms(&self) -> u32 {
         self.entries.iter().map(|e| e.duration()).sum()
     }
 
+    #[allow(dead_code)]
     pub fn get_color_sequence(&self) -> Vec<(u8, u8, u8)> {
         let mut colors = Vec::new();
         let mut r: u8 = 0;
@@ -118,6 +119,7 @@ impl LightShow {
 
     /// Evaluate the RGB color at a given offset (in ms) into the lightshow.
     /// Channels are sticky: only updated channels change, others retain previous values.
+    #[allow(dead_code)]
     pub fn color_at(&self, offset_ms: u32) -> (u8, u8, u8) {
         let mut r: u8 = 0;
         let mut g: u8 = 0;
@@ -145,12 +147,11 @@ impl LightShow {
 
 impl std::fmt::Display for LightShow {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut offset:u32 = 0;
+        let mut offset: u32 = 0;
         for entry in &self.entries {
-            write!(f, "\n\t{}.{:03}: {entry}", offset/1000, offset%1000)?;
+            write!(f, "\n\t{}.{:03}: {entry}", offset / 1000, offset % 1000)?;
             offset += entry.duration();
         }
-        write!(f,"")
+        write!(f, "")
     }
 }
-

@@ -1,6 +1,6 @@
 use a1800_codec::A1800Decoder;
 use binrw::*;
-const A1800_16KBPS_BITRATE:u16 = 0x3E80;//0000;
+const A1800_16KBPS_BITRATE: u16 = 0x3E80; //0000;
 
 #[binrw]
 #[brw(little)]
@@ -16,6 +16,7 @@ pub struct AudioClip {
 impl AudioClip {
     /// Duration of the audio clip in milliseconds.
     /// At 16000 bps the data rate is 2000 bytes/sec.
+    #[allow(dead_code)]
     pub fn duration_ms(&self) -> f64 {
         self.data.len() as f64 / 2.0
     }
@@ -41,11 +42,12 @@ impl AudioClip {
                 .map(|chunk| i16::from_le_bytes([chunk[0], chunk[1]]))
                 .collect();
 
-            decoder.decode_frame(&input, &mut output).expect("decode error");
+            decoder
+                .decode_frame(&input, &mut output)
+                .expect("decode error");
             pcm.extend_from_slice(&output);
         }
 
         pcm
     }
 }
-
