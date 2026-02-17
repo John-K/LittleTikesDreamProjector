@@ -79,6 +79,10 @@ fn cmd_extract(args: &mut pico_args::Arguments) -> Result<()> {
         write_wav(&out_dir.join(format!("Effect_{:02}.wav", i)), &effect.audio)?;
     }
 
+    const ID_OFFSET: usize = 0xFFF80;
+    let id_bytes = &cursor.get_ref()[ID_OFFSET..ID_OFFSET + 16];
+    std::fs::write(out_dir.join("id.bin"), id_bytes)?;
+
     Ok(())
 }
 
@@ -110,7 +114,7 @@ fn cmd_build(args: &mut pico_args::Arguments) -> Result<()> {
         .opt_value_from_str("--out")?
         .unwrap_or_else(|| PathBuf::from("out.bin"));
     let id_hex: Option<String> = args.opt_value_from_str("--id")?;
-    let id_bytes: Option<[u8; 16]> = id_hex
+    let id_bytes_from_flag: Option<[u8; 16]> = id_hex
         .map(|s| {
             if s.len() != 32 {
                 bail!("--id must be exactly 32 hex characters (got {})", s.len());
@@ -127,6 +131,22 @@ fn cmd_build(args: &mut pico_args::Arguments) -> Result<()> {
     if !remaining.is_empty() {
         bail!("unexpected arguments: {:?}", remaining);
     }
+
+    // --id flag takes precedence; fall back to id.bin in source directory
+    let id_bytes: Option<[u8; 16]> = if let Some(b) = id_bytes_from_flag {
+        Some(b)
+    } else {
+        let id_path = src_dir.join("id.bin");
+        if id_path.exists() {
+            let raw = std::fs::read(&id_path)?;
+            if raw.len() != 16 {
+                bail!("id.bin must be exactly 16 bytes (got {})", raw.len());
+            }
+            Some(raw.try_into().unwrap())
+        } else {
+            None
+        }
+    };
 
     // Collect pages in order (stop at first gap)
     let mut page_bufs: Vec<Vec<u8>> = Vec::new();
