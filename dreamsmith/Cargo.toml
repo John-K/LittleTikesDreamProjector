@@ -11,3 +11,5 @@ hex = "0.4.3"
 eframe = "0.31"
 int-enum = "1.2.0"
 rodio = { version = "0.21", default-features = false, features = ["playback", "hound"] }
+hound = "3"
+pico-args = "0.5.0"
